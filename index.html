@@ -54,63 +54,29 @@
           }
         });
 
-      // Gemini 모델 다중 호출을 위한 함수들
+      const API_URL = "https://toothsome-western-ermine.glitch.me";
 
-      // 사용할 Gemini 모델 목록 (우선순위 순서)
-      const models = [
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite-preview-02-05",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro",
-        "gemini-2.0-pro-exp-02-05",
-        "gemini-2.0-flash-thinking-exp-01-21",
-        "gemini-2.0-flash-exp",
-        "gemini-exp-1206",
-      ];
-
-      // Gemini API 키 및 엔드포인트 (실제 서비스에서는 API 키를 안전하게 관리하세요)
-      //   const API_KEY = ""; // 실제 API 키로 교체
-      const API_URL =
-        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-
-      // 각 모델을 순차적으로 호출하는 함수
       async function callModels(payload) {
-        for (const model of models) {
-          payload.model = model; // 현재 모델 설정
-          console.log(`모델 ${model} 호출 시도...`);
-          try {
-            const response = await fetch(API_URL, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: "Bearer " + API_KEY,
-              },
-              body: JSON.stringify(payload),
-            });
-            if (!response.ok) {
-              console.warn(`모델 ${model} 호출 실패: ${response.status}`);
-              continue; // 실패하면 다음 모델로 넘어감
-            }
-            const data = await response.json();
-            console.log(`모델 ${model} 응답:`, data);
-            if (
-              data.choices &&
-              data.choices.length > 0 &&
-              data.choices[0].message &&
-              data.choices[0].message.content
-            ) {
-              return {
-                modelUsed: model,
-                result: data.choices[0].message.content,
-              };
-            }
-          } catch (error) {
-            console.warn(`모델 ${model} 호출 중 오류 발생: ${error.message}`);
-            continue;
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            console.warn(`API 요청 실패: ${response.status}`);
+            return null;
           }
+
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error(`API 호출 중 오류 발생: ${error.message}`);
+          return null;
         }
-        return null; // 모든 모델 실패 시 null 반환
       }
 
       // 글로벌 재시도 로직: 모델 다중 호출 이후에 재시도
