@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Vision Gemini 모델 다중 호출 통합</title>
+    <style>
+      #preview {
+        margin-top: 20px;
+        max-width: 300px;
+        border: 1px solid #ccc;
+      }
+      .result {
+        margin-top: 20px;
+        white-space: pre-wrap;
+        border: 1px solid #eee;
+        padding: 10px;
+        max-width: 300px;
+      }
+      button {
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Gemini 모델 다중 호출 예제</h1>
+
+    <!-- 이미지 파일 선택 -->
+    <input type="file" id="image-input" accept="image/*" />
+
+    <!-- 이미지 미리보기 -->
+    <div>
+      <img id="preview" src="" alt="선택한 이미지 미리보기" />
+    </div>
+
+    <!-- Gemini 호출 버튼 -->
+    <button id="gemini-button">Gemini 모델 다중 호출 실행</button>
+
+    <!-- 결과 출력 영역 -->
+    <div id="gemini-result" class="result"></div>
+
+    <script>
+      // 이미지 미리보기 업데이트 (파일 선택 시)
+      document
+        .getElementById("image-input")
+        .addEventListener("change", (event) => {
+          const fileInput = event.target;
+          if (fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              document.getElementById("preview").src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+      // Gemini 모델 다중 호출을 위한 함수들
+
+      // 사용할 Gemini 모델 목록 (우선순위 순서)
+      const models = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite-preview-02-05",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+        "gemini-1.5-pro",
+        "gemini-2.0-pro-exp-02-05",
+        "gemini-2.0-flash-thinking-exp-01-21",
+        "gemini-2.0-flash-exp",
+        "gemini-exp-1206",
+      ];
+
+      // Gemini API 키 및 엔드포인트 (실제 서비스에서는 API 키를 안전하게 관리하세요)
+      //   const API_KEY = ""; // 실제 API 키로 교체
+      const API_URL =
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+      // 각 모델을 순차적으로 호출하는 함수
+      async function callModels(payload) {
+        for (const model of models) {
+          payload.model = model; // 현재 모델 설정
+          console.log(`모델 ${model} 호출 시도...`);
+          try {
+            const response = await fetch(API_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + API_KEY,
+              },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+              console.warn(`모델 ${model} 호출 실패: ${response.status}`);
+              continue; // 실패하면 다음 모델로 넘어감
+            }
+            const data = await response.json();
+            console.log(`모델 ${model} 응답:`, data);
+            if (
+              data.choices &&
+              data.choices.length > 0 &&
+              data.choices[0].message &&
+              data.choices[0].message.content
+            ) {
+              return {
+                modelUsed: model,
+                result: data.choices[0].message.content,
+              };
+            }
+          } catch (error) {
+            console.warn(`모델 ${model} 호출 중 오류 발생: ${error.message}`);
+            continue;
+          }
+        }
+        return null; // 모든 모델 실패 시 null 반환
+      }
+
+      // 글로벌 재시도 로직: 모델 다중 호출 이후에 재시도
+      async function callModelsWithGlobalRetry(
+        payload,
+        retries = 3,
+        delay = 3000
+      ) {
+        let result = await callModels(payload);
+        if (result) {
+          return result;
+        } else if (retries > 0) {
+          console.warn(
+            `모든 모델에서 결과를 받지 못했습니다. ${delay}ms 후 재시도... (남은 재시도: ${retries})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return callModelsWithGlobalRetry(payload, retries - 1, delay * 2);
+        }
+        return null;
+      }
+
+      // Gemini 모델 다중 호출 실행 버튼 이벤트
+      document
+        .getElementById("gemini-button")
+        .addEventListener("click", async () => {
+          const fileInput = document.getElementById("image-input");
+          if (!fileInput.files || fileInput.files.length === 0) {
+            alert("이미지를 선택해주세요.");
+            return;
+          }
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          reader.onload = async function () {
+            // data URL에서 base64 데이터 추출
+            const base64Data = reader.result.split(",")[1];
+            // 요청 페이로드 구성
+            // 프롬프트: "이 이미지에 있는 동물이 무엇이며, 그 동물의 종(종류)이 무엇인지 알려주세요."
+            const payload = {
+              model: "", // 이후 각 모델로 설정됨.
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: "이 이미지에 있는 동물이 무엇이며, 그 동물의 종(종류)이 무엇인지 알려주세요.",
+                    },
+                    {
+                      type: "image_url",
+                      image_url: {
+                        url: `data:${file.type};base64,${base64Data}`,
+                      },
+                    },
+                  ],
+                },
+              ],
+            };
+
+            // 글로벌 재시도 로직을 통해 모델 호출
+            const resultObj = await callModelsWithGlobalRetry(payload);
+            if (resultObj) {
+              document.getElementById(
+                "gemini-result"
+              ).innerText = `모델 ${resultObj.modelUsed} 사용 결과:\n\n${resultObj.result}`;
+            } else {
+              document.getElementById("gemini-result").innerText =
+                "모든 모델에서 결과를 받아오지 못했습니다.";
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+    </script>
+  </body>
+</html>
