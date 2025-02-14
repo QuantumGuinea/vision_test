@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vision Gemini 모델 다중 호출 통합</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+  </head>
+  <body>
+    <h1>Gemini Model Chaining</h1>
+
+    <!-- 이미지 파일 선택 -->
+    <!-- <input type="file" id="image-input" accept="image/*" /> -->
+    <input type="file" id="imageInput" />
+
+    <!-- 이미지 미리보기 -->
+    <div>
+      <img
+        id="preview"
+        src=""
+        alt="선택한 이미지 미리보기"
+        style="max-width: 300px"
+      />
+    </div>
+
+    <!-- Gemini 호출 버튼 -->
+    <button id="gemini-button">Gemini 모델 다중 호출 실행</button>
+
+    <!-- 결과 출력 영역 -->
+    <div id="gemini-result" class="result"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
